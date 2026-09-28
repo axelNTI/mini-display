@@ -37,7 +37,7 @@ export default () => {
         })}
       </p>
 
-      <p className="mt-6 text-3xl opacity-50 tracking-widest uppercase">
+      <p className="mt-6 text-3xl opacity-50 tracking-widest uppercase select-none">
         {time.toLocaleDateString("sv-SE", {
           weekday: "long",
           day: "numeric",
