@@ -53,6 +53,10 @@ async function loadSpotifySession(): Promise<SpotifyTokens | null> {
   const refreshToken = await invoke<string | null>("load_spotify_refresh_token");
   if (!refreshToken) return null;
 
+  return refreshSpotifySession(refreshToken);
+}
+
+export async function refreshSpotifySession(refreshToken: string): Promise<SpotifyTokens> {
   const tokens = await refreshAccessToken(refreshToken);
   await invoke("store_spotify_refresh_token", { refreshToken: tokens.refresh_token });
   return tokens;
