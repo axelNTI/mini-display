@@ -38,7 +38,11 @@ const images = [
   image15,
 ];
 
-const randomImage = (): string => images[Math.floor(Math.random() * images.length)];
+const randomImage = (current?: string): string => {
+  return current
+    ? images.filter((img) => img !== current)[Math.floor(Math.random() * images.length - 1)]
+    : images[Math.floor(Math.random() * images.length)];
+};
 
 const preloadImage = async (src: string) => {
   const image = new Image();
@@ -56,9 +60,8 @@ export default () => {
 
   useEffect(() => {
     const update = async () => {
-      const next = randomImage();
+      const next = randomImage(imagesState[0]);
 
-      // Make sure the next image is fully loaded before showing it.
       await preloadImage(next);
 
       setImagesState((current) => {
@@ -77,7 +80,7 @@ export default () => {
     let timeout = setTimeout(update, 60 * 1000 - (Date.now() % (60 * 1000)));
 
     return () => clearTimeout(timeout);
-  }, [active]);
+  }, [active, imagesState[0]]);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-black">

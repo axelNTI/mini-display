@@ -17,8 +17,33 @@ export default () => {
   }, []);
 
   return (
-    <div className="transparent">
-      <p>{time.toTimeString().split(" ")[0]}</p>
+    <div className="w-full h-full flex flex-col items-center justify-center transparent rd-4">
+      <p
+        className="
+        font-mono
+        text-[9rem]
+        leading-none
+        font-300
+        tracking-[-0.06em]
+        tabular-nums
+        select-none
+      "
+      >
+        {time.toLocaleTimeString("sv-SE", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        })}
+      </p>
+
+      <p className="mt-6 text-3xl opacity-50 tracking-widest uppercase">
+        {time.toLocaleDateString("sv-SE", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        })}
+      </p>
     </div>
   );
 };

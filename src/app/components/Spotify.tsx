@@ -1,1 +1,1 @@
-export default () => <div className="transparent"></div>;
+export default () => <div className="transparent rd-4"></div>;
