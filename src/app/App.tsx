@@ -40,7 +40,7 @@ const images = [
 
 const randomImage = (current?: string): string => {
   return current
-    ? images.filter((img) => img !== current)[Math.floor(Math.random() * images.length - 1)]
+    ? images.filter((img) => img !== current)[Math.floor(Math.random() * (images.length - 1))]
     : images[Math.floor(Math.random() * images.length)];
 };
 
