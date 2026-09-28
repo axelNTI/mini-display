@@ -1,3 +1,7 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { openUrl } from "@tauri-apps/plugin-opener";
+
 export const spotifyRedirectUri = "http://127.0.0.1:43821/callback";
 
 export interface SpotifyTokens {
@@ -26,6 +30,92 @@ export function createCodeVerifier(): string {
 export async function createCodeChallenge(verifier: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
   return encodeBase64Url(new Uint8Array(digest));
+}
+
+let spotifySessionRestore: Promise<SpotifyTokens | null> | undefined;
+
+export function restoreSpotifySession(): Promise<SpotifyTokens | null> {
+  if (spotifySessionRestore) return spotifySessionRestore;
+
+  spotifySessionRestore = loadSpotifySession();
+  void spotifySessionRestore.then(
+    () => {
+      spotifySessionRestore = undefined;
+    },
+    () => {
+      spotifySessionRestore = undefined;
+    },
+  );
+  return spotifySessionRestore;
+}
+
+async function loadSpotifySession(): Promise<SpotifyTokens | null> {
+  const refreshToken = await invoke<string | null>("load_spotify_refresh_token");
+  if (!refreshToken) return null;
+
+  const tokens = await refreshAccessToken(refreshToken);
+  await invoke("store_spotify_refresh_token", { refreshToken: tokens.refresh_token });
+  return tokens;
+}
+
+export async function connectSpotify(): Promise<SpotifyTokens> {
+  const verifier = createCodeVerifier();
+  const state = createCodeVerifier();
+  const challenge = await createCodeChallenge(verifier);
+
+  return new Promise<SpotifyTokens>((resolve, reject) => {
+    let settled = false;
+    let unlistenCallback: (() => void) | undefined;
+    let unlistenTimeout: (() => void) | undefined;
+    const stopListening = () => {
+      unlistenCallback?.();
+      unlistenTimeout?.();
+    };
+    const finish = (callback: typeof resolve | typeof reject, value: SpotifyTokens | unknown) => {
+      if (settled) return;
+      settled = true;
+      stopListening();
+      callback(value as never);
+    };
+
+    void (async () => {
+      try {
+        unlistenCallback = await listen<string>("spotify-auth-callback", ({ payload }) => {
+          if (settled) return;
+          void (async () => {
+            try {
+              const callback = new URL(payload);
+              if (callback.searchParams.get("state") !== state) {
+                throw new Error("Spotify authorization state did not match");
+              }
+
+              const authorizationError = callback.searchParams.get("error");
+              if (authorizationError) throw new Error(`Spotify authorization failed: ${authorizationError}`);
+
+              const code = callback.searchParams.get("code");
+              if (!code) throw new Error("Spotify callback did not include an authorization code");
+
+              const tokens = await exchangeCode(code, verifier);
+              await invoke("store_spotify_refresh_token", {
+                refreshToken: tokens.refresh_token,
+              });
+              finish(resolve, tokens);
+            } catch (error) {
+              finish(reject, error);
+            }
+          })();
+        });
+        unlistenTimeout = await listen("spotify-auth-timeout", () => {
+          finish(reject, new Error("Spotify authorization timed out"));
+        });
+
+        await invoke("start_spotify_callback");
+        await openUrl(createAuthorizationUrl(state, challenge));
+      } catch (error) {
+        finish(reject, error);
+      }
+    })();
+  });
 }
 
 function encodeBase64Url(bytes: Uint8Array): string {
